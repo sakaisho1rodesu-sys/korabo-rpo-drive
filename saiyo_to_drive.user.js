@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         採用媒体 → Drive 連番保存
 // @namespace    korabo.rpo
-// @version      4.2
+// @version      4.4
 // @updateURL    https://raw.githubusercontent.com/sakaisho1rodesu-sys/korabo-rpo-drive/main/saiyo_to_drive.user.js
 // @downloadURL  https://raw.githubusercontent.com/sakaisho1rodesu-sys/korabo-rpo-drive/main/saiyo_to_drive.user.js
 // @description  Green / リクナビHRTech / doda / エンエージェント / CIRCUS の管理画面から応募書類を取得し、Driveに連番フォルダを作って保存、推薦者台帳へ１行追加する
@@ -32,16 +32,24 @@
   var DODA_ALLOWED_COMPANY = String(GM_getValue('doda_allowed', '') || '')
     .split(/[,、\n]/).map(function (x) { return x.trim(); }).filter(Boolean);
 
-  // 設定メニュー（Tampermonkeyのアイコン → このスクリプト → 各項目）
+  // 設定。パネルの下の「設定」ボタンから開く（Tampermonkeyのメニューにも同じ項目を出す）
+  function askToken() {
+    var v = prompt('GASのトークンを入力してください', gasToken());
+    if (v === null) return;
+    GM_setValue('gas_token', v.trim());
+    alert('GASトークンを保存しました。画面を読み込み直します。');
+    location.reload();
+  }
+  function askCompany() {
+    var v = prompt('保存を許可するdodaの社名を入力してください（複数は「,」区切り）', DODA_ALLOWED_COMPANY.join(','));
+    if (v === null) return;
+    GM_setValue('doda_allowed', v.trim());
+    alert('対象の社名を保存しました。画面を読み込み直します。');
+    location.reload();
+  }
   try {
-    GM_registerMenuCommand('GASトークンを設定', function () {
-      var v = prompt('GASのトークンを入力してください（Apps Scriptで printGreenToken を実行すると表示されます）', gasToken());
-      if (v !== null) { GM_setValue('gas_token', v.trim()); alert('保存しました。ページを開き直してください。'); }
-    });
-    GM_registerMenuCommand('doda対象の社名を設定', function () {
-      var v = prompt('保存を許可するdodaの社名を入力してください（複数は「,」区切り）', DODA_ALLOWED_COMPANY.join(','));
-      if (v !== null) { GM_setValue('doda_allowed', v.trim()); alert('保存しました。ページを開き直してください。'); }
-    });
+    GM_registerMenuCommand('GASトークンを設定', askToken);
+    GM_registerMenuCommand('doda対象の社名を設定', askCompany);
   } catch (e) {}
 
   var PANEL_ID = 'korabo-saiyo-panel';
@@ -1050,7 +1058,9 @@
     ].join(';');
 
     var title = document.createElement('span');
-    title.textContent = THEME.label;
+    var ver = '';
+    try { ver = GM_info.script.version; } catch (e) {}
+    title.textContent = THEME.label + (ver ? '　Ver' + ver : '');
 
     var close = document.createElement('span');
     close.textContent = '×';
@@ -1146,6 +1156,21 @@
     msg.textContent = AD.idle;
 
     body.appendChild(msg);
+
+    // 設定ボタン（メニューが出ない環境でも設定できるように、パネルの中にも置く）
+    var setRow = document.createElement('div');
+    setRow.style.cssText = 'margin-top:8px;padding-top:6px;border-top:1px solid #eee;display:flex;gap:6px;flex-wrap:wrap';
+    var mkBtn = function (label, fn) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.style.cssText = 'cursor:pointer;padding:3px 8px;font-size:11px;border:1px solid #bbb;border-radius:4px;background:#fafafa;color:#444';
+      b.addEventListener('click', fn);
+      return b;
+    };
+    setRow.appendChild(mkBtn('設定：トークン', askToken));
+    if (SITE === 'doda') setRow.appendChild(mkBtn('設定：対象の社名', askCompany));
+    body.appendChild(setRow);
     box.appendChild(bar);
     box.appendChild(body);
     document.body.appendChild(box);
